@@ -1,9 +1,12 @@
-/**
+	/**
  * File: poi.hpp
  * Modification of ccfs.hpp by Ahmad Zaky
  */
 
 #pragma once
+#define SLOT_NUM 65536
+#define SLOT_SIZE 32
+//#define DATA_START HEADER_SIZE
 
 #include <cstdlib>
 #include <cstring>
@@ -38,14 +41,13 @@ public:
 	
 	/* buat file *.poi */
 	void create(const char *filename);
-	void initVolumeInformation(const char *filename);
-	void initAllocationTable();
+	void initHeader(const char *_volumeName);
 	void initDataPool();
+
 	
 	/* baca file *.poi */
 	void load(const char *filename);
-	void readVolumeInformation();
-	void readAllocationTable();
+	void readHeader();
 	
 	void writeVolumeInformation();
 	void writeAllocationTable(ptr_block position);
@@ -60,18 +62,16 @@ public:
 	int writeBlock(ptr_block position, const char *buffer, int size, int offset = 0);
 
 /* Attributes */
-	fstream handle;			// file .poi
-	ptr_block nextBlock[N_BLOCK];	//pointer ke blok berikutnya
-	
-	string filename;		// nama volume
-	int capacity;			// kapasitas filesystem dalam blok
+	fstream handle;			// File .poi
+	ptr_block nextBlock[N_BLOCK];
+	string volumeName;		// Nama volume
 	int available;			// jumlah slot yang masih kosong
 	int firstEmpty;			// slot pertama yang masih kosong
 	time_t mount_time;		// waktu mounting, diisi di konstruktor
 };
 
 /**
- * Kelas Entry
+ * Kelas entry
  */
 class Entry {
 public:

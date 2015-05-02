@@ -2,7 +2,7 @@
 
 #include "poi.hpp"
 
-/* Global filesystem */
+// Global filesystem 
 extern poi filesystem;
 
 
@@ -19,157 +19,165 @@ poi::~poi(){
 	handle.close();
 }
 
+
 /** buat file *.poi baru */
-void poi::create(const char *filename){
+void poi::create(const char *volumeName){
 	
-	/* buka file dengan mode input-output, binary dan truncate (untuk membuat file baru) */
-	handle.open(filename, fstream::in | fstream::out | fstream::binary | fstream::trunc);
+	// Buka file dengan mode input-output, binary dan truncate (untuk membuat file baru) 
+	handle.open(volumeName, fstream::in | fstream::out | fstream::binary | fstream::trunc);
 	
-	/* Bagian Volume Information */
-	initVolumeInformation(filename);
+	// Inisialisasi Volume Information & Allocation Table
+	initHeader(volumeName);
 	
-	/* Bagian Allocation Table */
-	initAllocationTable();
-	
-	/* Bagian Data Pool */
+	// Inisialisasi Data Pool 
 	initDataPool();
 	
+	// Tutup file
 	handle.close();
 }
-/** inisialisasi Volume Information */
-void poi::initVolumeInformation(const char *filename) {
-	/* buffer untuk menulis ke file */
+
+/** Inisialisasi header file system */
+void poi::initHeader(const char* _volumename){
+	/* Inisialisasi Volume Information */
+
+	// Buffer untuk menulis ke file
 	char buffer[BLOCK_SIZE];
 	memset(buffer, 0, BLOCK_SIZE);
 	
-	/* Magic string "poi!" */
+	// Magic string "poi!" 
 	memcpy(buffer + 0x00, "poi!", 4);
 	
-	/* Nama volume */
-	this->filename = string(filename);
-	memcpy(buffer + 0x04, filename, strlen(filename));
+	//  Nama volume 
+	volumeName = string(_volumename);
+	memcpy(buffer + 0x04, _volumename, strlen(_volumename));
 	
-	/* Kapasitas filesystem, dalam little endian */
-	capacity = N_BLOCK;
+	// Kapasitas filesystem, dalam little endian 
+	int capacity = N_BLOCK;
 	memcpy(buffer + 0x24, (char*)&capacity, 4);
 	
-	/* Jumlah blok yang belum terpakai, dalam little endian */
+	// Jumlah blok yang belum terpakai, dalam little endian 
 	available = N_BLOCK - 1;
 	memcpy(buffer + 0x28, (char*)&available, 4);
 	
-	/* Indeks blok pertama yang bebas, dalam little endian */
+	// Indeks blok pertama yang bebas, dalam little endian 
 	firstEmpty = 1;
 	memcpy(buffer + 0x2C, (char*)&firstEmpty, 4);
 	
-	/* String "!iop" */
+	// set byte ke 0x50 dengan null (otomatis)
+	
+	// Magic string "!iop" 
 	memcpy(buffer + 0x1FC, "!iop", 4);
 	
+	// Tulis ke file
 	handle.write(buffer, BLOCK_SIZE);
-}
-/** inisialisasi Allocation Table */
-void poi::initAllocationTable() {
-	short buffer = 0xFFFF;
+
+	/* Write Volume Information */
+
+	// Allocation Table untuk root 
+	short dataAloc = 0xFFFF;
+	handle.write((char*)&dataAloc, sizeof(short));
 	
-	/* Allocation Table untuk root */
-	handle.write((char*)&buffer, sizeof(short));
-	
-	/* Allocation Table untuk lainnya */
-	buffer = 0;
+	// Allocation Table untuk lainnya (default kosong) 
+	dataAloc = 0;
 	for (int i = 1; i < N_BLOCK; i++) {
-		handle.write((char*)&buffer, sizeof(short));
+		handle.write((char*)&dataAloc, sizeof(short));
 	}
 }
-/** inisialisasi Data Pool */
+
+/** Inisialisasi Data Pool */
 void poi::initDataPool() {
+	// Buffer untuk menulis ke file
 	char buffer[BLOCK_SIZE];
 	memset(buffer, 0, BLOCK_SIZE);
 	
+	// Inisialisasi blok kosong
 	for (int i = 0; i < N_BLOCK; i++) {
 		handle.write(buffer, BLOCK_SIZE);
 	}
 }
 
-/** baca file simple.fs */
-void poi::load(const char *filename){
-	/* buka file dengan mode input-output, dan binary */
-	handle.open(filename, fstream::in | fstream::out | fstream::binary);
-	
-	/* cek apakah file ada */
-	if (!handle.is_open()){
-		handle.close();
-		throw runtime_error("File not found");
-	}
-	
-	/* periksa Volume Information */
-	readVolumeInformation();
-	
-	/* baca Allocation Table */
-	readAllocationTable();
-}
-/** membaca Volume Information */
-void poi::readVolumeInformation() {
+void poi::readHeader(){
+	/*read volume information*/
 	char buffer[BLOCK_SIZE];
 	handle.seekg(0);
 	
-	/* Baca keseluruhan Volume Information */
+	// Baca keseluruhan Volume Information 
 	handle.read(buffer, BLOCK_SIZE);
 	
-	/* cek magic string */
+	// cek magic string 
 	if (string(buffer, 4) != "poi!") {
 		handle.close();
 		throw runtime_error("File is not a valid poi file");
 	}
 	
-	/* baca capacity */
+	// baca capacity
+	int capacity = N_BLOCK;
 	memcpy((char*)&capacity, buffer + 0x24, 4);
 	
-	/* baca available */
+	// baca available 
 	memcpy((char*)&available, buffer + 0x28, 4);
 	
-	/* baca firstEmpty */
+	// baca firstEmpty 
 	memcpy((char*)&firstEmpty, buffer + 0x2C, 4);
-}
-/** membaca Allocation Table */
-void poi::readAllocationTable() {
-	char buffer[3];
+	/* read allocation table*/
+		char allocbuffer[3];
 	
-	/* pindah posisi ke awal Allocation Table */
+	// pindah posisi ke awal Allocation Table 
 	handle.seekg(0x200);
 	
-	/* baca nilai nextBlock */
+	// baca nilai nextBlock 
 	for (int i = 0; i < N_BLOCK; i++) {
-		handle.read(buffer, 2);
-		memcpy((char*)&nextBlock[i], buffer, 2);
+		handle.read(allocbuffer, 2);
+		memcpy((char*)&nextBlock[i], allocbuffer, 2);
 	}
+
 }
-/** menuliskan Volume Information */
+
+/** baca file poifs */
+void poi::load(const char *volumeName){
+	// buka file dengan mode input-output, dan binary 
+	handle.open(volumeName, fstream::in | fstream::out | fstream::binary);
+	
+	// cek apakah file ada 
+	if (!handle.is_open()){
+		handle.close();
+		throw runtime_error("File not found");
+	}
+	
+	//periksa header
+	readHeader();
+}
+
+
 void poi::writeVolumeInformation() {
 	handle.seekp(0x00);
 	
-	/* buffer untuk menulis ke file */
+	// buffer untuk menulis ke file 
 	char buffer[BLOCK_SIZE];
 	memset(buffer, 0, BLOCK_SIZE);
 	
-	/* Magic string "poi" */
+	// Magic string "poi" 
 	memcpy(buffer + 0x00, "poi!", 4);
 	
-	/* Nama volume */
-	memcpy(buffer + 0x04, filename.c_str(), filename.length());
+	// Nama volume 
+	memcpy(buffer + 0x04, volumeName.c_str(), volumeName.length());
 	
-	/* Kapasitas filesystem, dalam little endian */
+	// Kapasitas filesystem, dalam little endian 
+	int capacity = N_BLOCK;
 	memcpy(buffer + 0x24, (char*)&capacity, 4);
 	
-	/* Jumlah blok yang belum terpakai, dalam little endian */
+	// Jumlah blok yang belum terpakai, dalam little endian 
 	memcpy(buffer + 0x28, (char*)&available, 4);
 	
-	/* Indeks blok pertama yang bebas, dalam little endian */
+	// Indeks blok pertama yang bebas, dalam little endian 
 	memcpy(buffer + 0x2C, (char*)&firstEmpty, 4);
 	
-	/* String "SFCC" */
+	// String "SFCC" 
 	memcpy(buffer + 0x1FC, "!iop", 4);
 	
 	handle.write(buffer, BLOCK_SIZE);
 }
+
 /** menuliskan Allocation Table pada posisi tertentu */
 void poi::writeAllocationTable(ptr_block position) {
 	handle.seekp(BLOCK_SIZE + sizeof(ptr_block) * position);
@@ -206,26 +214,27 @@ void poi::freeBlock(ptr_block position) {
 	}
 	writeVolumeInformation();
 }
+
 /** membaca isi block sebesar size kemudian menaruh hasilnya di buf */
 int poi::readBlock(ptr_block position, char *buffer, int size, int offset) {
-	/* kalau sudah di END_BLOCK, return */
+	// kalau sudah di END_BLOCK, return 
 	if (position == END_BLOCK) {
 		return 0;
 	}
-	/* kalau offset >= BLOCK_SIZE */
+	// kalau offset >= BLOCK_SIZE 
 	if (offset >= BLOCK_SIZE) {
 		return readBlock(nextBlock[position], buffer, size, offset - BLOCK_SIZE);
 	}
 	
 	handle.seekg(BLOCK_SIZE * DATA_POOL_OFFSET + position * BLOCK_SIZE + offset);
 	int size_now = size;
-	/* cuma bisa baca sampai sebesar block size */
+	// cuma bisa baca sampai sebesar block size 
 	if (offset + size_now > BLOCK_SIZE) {
 		size_now = BLOCK_SIZE - offset;
 	}
 	handle.read(buffer, size_now);
 	
-	/* kalau size > block size, lanjutkan di nextBlock */
+	// kalau size > block size, lanjutkan di nextBlock 
 	if (offset + size > BLOCK_SIZE) {
 		return size_now + readBlock(nextBlock[position], buffer + BLOCK_SIZE, offset + size - BLOCK_SIZE);
 	}
@@ -235,13 +244,13 @@ int poi::readBlock(ptr_block position, char *buffer, int size, int offset) {
 
 /** menuliskan isi buffer ke filesystem */
 int poi::writeBlock(ptr_block position, const char *buffer, int size, int offset) {
-	/* kalau sudah di END_BLOCK, return */
+	// kalau sudah di END_BLOCK, return 
 	if (position == END_BLOCK) {
 		return 0;
 	}
-	/* kalau offset >= BLOCK_SIZE */
+	// kalau offset >= BLOCK_SIZE 
 	if (offset >= BLOCK_SIZE) {
-		/* kalau nextBlock tidak ada, alokasikan */
+		// kalau nextBlock tidak ada, alokasikan 
 		if (nextBlock[position] == END_BLOCK) {
 			setNextBlock(position, allocateBlock());
 		}
@@ -255,9 +264,9 @@ int poi::writeBlock(ptr_block position, const char *buffer, int size, int offset
 	}
 	handle.write(buffer, size_now);
 	
-	/* kalau size > block size, lanjutkan di nextBlock */
+	// kalau size > block size, lanjutkan di nextBlock 
 	if (offset + size > BLOCK_SIZE) {
-		/* kalau nextBlock tidak ada, alokasikan */
+		// kalau nextBlock tidak ada, alokasikan 
 		if (nextBlock[position] == END_BLOCK) {
 			setNextBlock(position, allocateBlock());
 		}
@@ -282,7 +291,7 @@ Entry::Entry(ptr_block position, unsigned char offset) {
 	this->position = position;
 	this->offset = offset;
 	
-	/* baca dari data pool */
+	// baca dari data pool 
 	filesystem.handle.seekg(BLOCK_SIZE * DATA_POOL_OFFSET + position * BLOCK_SIZE + offset * ENTRY_SIZE);
 	filesystem.handle.read(data, ENTRY_SIZE);
 }
@@ -299,29 +308,29 @@ Entry Entry::nextEntry() {
 
 /** Mendapatkan Entry dari path */
 Entry Entry::getEntry(const char *path) {
-	/* mendapatkan direktori teratas */
+	// mendapatkan direktori teratas 
 	unsigned int endstr = 1;
 	while (path[endstr] != '/' && endstr < strlen(path)) {
 		endstr++;
 	}
 	string topDirectory = string(path + 1, endstr - 1);
 	
-	/* mencari entri dengan nama topDirectory */
+	// mencari entri dengan nama topDirectory 
 	while (getName() != topDirectory && position != END_BLOCK) {
 		*this = nextEntry();
 	}
 	
-	/* kalau tidak ketemu, return Entry kosong */
+	// kalau tidak ketemu, return Entry kosong 
 	if (isEmpty()) {
 		return Entry();
 	}
-	/* kalau ketemu, */
+	// kalau ketemu, 
 	else {
 		if (endstr == strlen(path)) {
 			return *this;
 		}
 		else {
-			/* cek apakah direktori atau bukan */
+			// cek apakah direktori atau bukan 
 			if (getAttr() & 0x8) {
 				ptr_block index;
 				memcpy((char*)&index, data + 0x1A, 2);
@@ -337,20 +346,20 @@ Entry Entry::getEntry(const char *path) {
 
 /** Mendapatkan Entry dari path */
 Entry Entry::getNewEntry(const char *path) {
-	/* mendapatkan direktori teratas */
+	// mendapatkan direktori teratas 
 	unsigned int endstr = 1;
 	while (path[endstr] != '/' && endstr < strlen(path)) {
 		endstr++;
 	}
 	string topDirectory = string(path + 1, endstr - 1);
 	
-	/* mencari entri dengan nama topDirectory */
+	// mencari entri dengan nama topDirectory 
 	Entry entry(position, offset);
 	while (getName() != topDirectory && position != END_BLOCK) {
 		*this = nextEntry();
 	}
 	
-	/* kalau tidak ketemu, buat entry baru */
+	// kalau tidak ketemu, buat entry baru 
 	if (isEmpty()) {
 		while (!entry.isEmpty()) {
 			if (entry.nextEntry().position == END_BLOCK) {
@@ -360,7 +369,7 @@ Entry Entry::getNewEntry(const char *path) {
 				entry = entry.nextEntry();
 			}
 		}
-		/* beri atribut pada entry */
+		// beri atribut pada entry 
 		entry.setName(topDirectory.c_str());
 		entry.setAttr(0xF);
 		entry.setIndex(filesystem.allocateBlock());
@@ -376,7 +385,7 @@ Entry Entry::getNewEntry(const char *path) {
 		return *this;
 	}
 	else {
-		/* cek apakah direktori atau bukan */
+		// cek apakah direktori atau bukan 
 		if (getAttr() & 0x8) {
 			ptr_block index;
 			memcpy((char*)&index, data + 0x1A, 2);
@@ -397,7 +406,7 @@ Entry Entry::getNextEmptyEntry() {
 		entry = entry.nextEntry();
 	}
 	if (entry.position == END_BLOCK) {
-		/* berarti blok saat ini sudah penuh, buat blok baru */
+		// berarti blok saat ini sudah penuh, buat blok baru 
 		ptr_block newPosition = filesystem.allocateBlock();
 		ptr_block lastPos = position;
 		while (filesystem.nextBlock[lastPos] != END_BLOCK) {
@@ -413,7 +422,7 @@ Entry Entry::getNextEmptyEntry() {
 
 /** mengosongkan entry */
 void Entry::makeEmpty() {
-	/* menghapus byte pertama data */
+	// menghapus byte pertama data 
 	*(data) = 0;
 	write();
 }

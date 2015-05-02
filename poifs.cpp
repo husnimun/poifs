@@ -1,43 +1,44 @@
 #include "poifs.hpp"
 using namespace std;
 
-// pake filesystem yg ada di main.cpp
+/* Global file system POI pada Main.cpp*/
 extern poi filesystem;
 
 /************ Implementasi FUSE ***************/
 
-/* get attribute */
+/* Get Attribute */
 int poifs_getattr(const char* path, struct stat* stbuf) {
-	/* jika root path */
+	/* Penanganan direktori root */
 	if (string(path) == "/"){
+		// Diasumsikan direktori root memiliki permission read-write-excecute,read-write,read-write
 		stbuf->st_nlink = 1;
-		stbuf->st_mode = S_IFDIR | 0777; // file dengan permission rwxrwxrwx
+		stbuf->st_mode = S_IFDIR | 0755;
 		stbuf->st_mtime = filesystem.mount_time;
 		return 0;
 	}
 	else {
+		/* PenangananFile/folder selain root directory */
 		Entry entry = Entry(0, 0).getEntry(path);
 		
-		//Kalau path tidak ditemukan
+		// Penanganan file tidak valid
 		if (entry.isEmpty()) {
-			return -ENOENT;
+			return -errno;
 		}
 		
-		// tulis stbuf, tempat memasukkan atribut file
+		// Tulis atribut file
 		stbuf->st_nlink = 1;
 		
-		// cek direktori atau bukan
+		// Cek file/direktori
 		if (entry.getAttr() & 0x8) {
 			stbuf->st_mode = S_IFDIR | (0770 + (entry.getAttr() & 0x7));
-		}
-		else {
+		} else {
 			stbuf->st_mode = S_IFREG | (0660 + (entry.getAttr() & 0x7));
 		}
 		
-		// ukuran file
+		// Tulis ukuran file
 		stbuf->st_size = entry.getSize();
 		
-		// waktu pembuatan file
+		// Tulis waktu pembuatan file
 		stbuf->st_mtime = entry.getDateTime();
 		
 		return 0;
@@ -68,6 +69,7 @@ int poifs_readdir(const char* path, void* buf, fuse_fill_dir_t filler, off_t off
 
 /* membuat direktori */
 int poifs_mkdir(const char *path, mode_t mode) {
+
 	/* mencari parent directory */
 	int i;
 	for(i = strlen(path)-1;path[i]!='/';i--);
