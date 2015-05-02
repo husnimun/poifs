@@ -10,16 +10,17 @@ struct fuse_operations poifs_op;
 void init_fuse() {
 	poifs_op.getattr	= poifs_getattr;
 	poifs_op.readdir	= poifs_readdir;
-	poifs_op.mkdir	= poifs_mkdir;
-	poifs_op.open 	= poifs_open;
-	poifs_op.rmdir 	= poifs_rmdir;
-	poifs_op.rename	= poifs_rename;
-	poifs_op.unlink	= poifs_unlink;
-	poifs_op.mknod	= poifs_mknod;
-	poifs_op.truncate= poifs_truncate;
-	poifs_op.write	= poifs_write;
-	poifs_op.read	= poifs_read;
-	poifs_op.link	= poifs_link;
+	poifs_op.mkdir		= poifs_mkdir;
+	poifs_op.open 		= poifs_open;
+	poifs_op.rmdir 		= poifs_rmdir;
+	poifs_op.rename		= poifs_rename;
+	poifs_op.unlink		= poifs_unlink;
+	poifs_op.mknod		= poifs_mknod;
+	poifs_op.truncate	= poifs_truncate;
+	poifs_op.write		= poifs_write;
+	poifs_op.read		= poifs_read;
+	poifs_op.link		= poifs_link;
+	poifs_op.chmod		= poifs_chmod;
 }
 
 /* Variabel global file system POI */

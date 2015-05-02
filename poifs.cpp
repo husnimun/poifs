@@ -12,7 +12,7 @@ int poifs_getattr(const char* path, struct stat* stbuf) {
 	if (string(path) == "/"){
 		// Diasumsikan direktori root memiliki permission read-write-excecute,read-write,read-write
 		stbuf->st_nlink = 1;
-		stbuf->st_mode = S_IFDIR | 0755;
+		stbuf->st_mode = S_IFDIR | 0777;
 		stbuf->st_mtime = filesystem.mount_time;
 		return 0;
 	}
@@ -22,7 +22,7 @@ int poifs_getattr(const char* path, struct stat* stbuf) {
 		
 		// Penanganan file tidak valid
 		if (entry.isEmpty()) {
-			return -errno;
+			return -ENOENT;
 		}
 		
 		// Tulis atribut file
@@ -45,12 +45,13 @@ int poifs_getattr(const char* path, struct stat* stbuf) {
 	}
 }
 
-/* membaca direktori: mendaftar file & direktori dalam suatu path */
+/* Read Direcmembaca direktori: mendaftar file & direktori dalam suatu path */
 int poifs_readdir(const char* path, void* buf, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info* fi) {
 	// current & parent directory
 	filler(buf, ".", NULL, 0);
 	filler(buf, "..", NULL, 0);
 	
+	// membuat  
 	Entry entry = Entry(0,0).getEntry(path);
 	ptr_block index = entry.getIndex();
 	entry = Entry(index,0);
@@ -296,5 +297,18 @@ int poifs_link(const char *path, const char *newpath) {
 		offset += 4096;
 	}
 	
+	return 0;
+}
+
+int poifs_chmod(const char *path, unsigned int mode) {
+	Entry entry = Entry(0, 0).getEntry(path);
+
+	if (entry.isEmpty()) {
+		return -ENOENT;
+	}
+
+	entry.setAttr(mode);
+	entry.write();
+
 	return 0;
 }
