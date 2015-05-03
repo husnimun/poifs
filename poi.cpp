@@ -76,9 +76,6 @@ void poi::initHeader(const char* _volumename){
 	// Indeks blok pertama yang bebas, dalam little endian 
 	firstEmpty = 1;
 	memcpy(buffer + 0x2C, (char*)&firstEmpty, 4);
-	
-	// Direktori root
-	memcpy(buffer + 0x30, (char*)&firstEmpty, 32);
 
 	// set byte ke 0x50 dengan null (otomatis)
 	
