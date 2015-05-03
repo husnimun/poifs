@@ -1,10 +1,15 @@
+/**
+ * File: main.cpp
+ * Modification of main.cpp by Ahmad Zaky and Faiz Ilham
+ */
+/** Definisi library **/
 #include <iostream>
-#include "poifs.hpp"
-#include "poi.hpp"
-
+#include "poi_fs.h"
+#include "poi.h"
 using namespace std;
 
-/* Inisialisasi fungsi FUSE */
+
+/** Inisialisasi fungsi FUSE **/
 struct fuse_operations poifs_op;
 
 void init_fuse() {
@@ -23,9 +28,12 @@ void init_fuse() {
 	poifs_op.chmod		= poifs_chmod;
 }
 
-/* Variabel global file system POI */
+
+/** Variabel global filesystem *.poi **/
 poi filesystem;
 
+
+/* Fungsi Main */
 int main(int argc, char** argv){
 	// Invalid usage 
 	if (argc < 3) {
